@@ -44,8 +44,7 @@
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"UITableViewCell"];
     if (cell) {
-//        cell.contentView.backgroundColor = [UIColor blueColor];
-        cell.textLabel.text = [NSString stringWithFormat:@"seciont = %ld,row = %ld",indexPath.section,indexPath.row];
+        cell.textLabel.text = [NSString stringWithFormat:@"seciont = %ld,row = %ld,%@",indexPath.section,indexPath.row,self.iddsss];
     }
     return cell;
 }
