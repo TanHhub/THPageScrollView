@@ -14,25 +14,41 @@
 
 @optional
 
-- (void)pageScrollView:(THPageScrollView *)pageScrollView didScrollToIndex:(NSInteger)index;
+/**
+ mainsScrollView scroll delegate
+ */
+- (void)verticalScrollViewDidScroll:(UIScrollView *_Nullable)scrollView;
+
+- (void)verticalScrollViewWillBeginDragging:(UIScrollView *_Nullable)scrollView;
+
+- (void)verticalScrollViewDidEndDecelerating:(UIScrollView *_Nullable)scrollView;
+
+- (void)verticalScrollViewDidEndScrollingAnimation:(UIScrollView *_Nullable)scrollView;
 
 /**
- scrollview delegate
+ horizontalScrollView begin to scroll
+
+ @param page THPageScrollView
+ @param currentIndex begin scroll's index
  */
-- (void)scrollViewDidScroll:(UIScrollView *)scrollView;
+- (void)pageScrollView:(THPageScrollView *_Nonnull)page horizontalScrollViewBeginScrollIndex:(NSInteger)currentIndex;
 
-- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView;
+/**
+ horizontalScrollView end scroll
 
-- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView;
+ @param page THPageScrollView
+ @param currentIndex end scroll 's index
+ */
+- (void)pageScrollView:(THPageScrollView *_Nonnull)page horizontalScrollViewEndScrollIndex:(NSInteger)currentIndex;
 
-- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView;
 
+/**
+ horizontalScrollView scrollWiewDidScroll
 
-- (void)pageScrollView:(THPageScrollView *)page horizontalScrollViewBeginScrollIndex:(NSInteger)currentIndex;
-
-- (void)pageScrollView:(THPageScrollView *)page horizontalScrollViewEndScrollIndex:(NSInteger)currentIndex;
-
-- (void)pageScrollView:(THPageScrollView *)page horizontalScrollViewScrollOffsetX:(CGFloat)offsetX;
+ @param page THPageScrollView
+ @param offsetX horizontalScrollView.contentOffset.x
+ */
+- (void)pageScrollView:(THPageScrollView *_Nonnull)page horizontalScrollViewScrollOffsetX:(CGFloat)offsetX;
 
 @end
 
@@ -41,43 +57,47 @@
 @required
 
 /**
- 子控制器的数量
+child views count
  */
-- (NSUInteger)numberOfChildControllersInPageView:(THPageScrollView *)pageView;
+- (NSUInteger)numberOfChildViewsInPageView:(THPageScrollView *_Nonnull)pageView;
 
 /**
- 返回当前index 下的对应的view
+ view at index
 
  @param pageScrollView PageScrollView
  @param index index
  @return PageScrollView
  */
-- (UIView *)pageScrollView:(THPageScrollView *)pageScrollView viewForItemAtIndex:(NSInteger)index;
+- (UIView *_Nonnull)pageScrollView:(THPageScrollView *_Nullable)pageScrollView viewForItemAtIndex:(NSInteger)index;
 
 /**
- 返回当前index 下的对应的scrollview
+ scroll view at index,used to observer the scrollView.contentSize,
+ 
+ UITableView,UICollectionView,if "viewForItemAtIndex" returns nil, will add scrollView as subview,
+
+ 
  @param pageScrollView PageScrollView
  @param index index
  @return scrollview
  */
 
-- (UIScrollView *)pageScrollView:(THPageScrollView *)pageScrollView scrollViewForItemAtIndex:(NSInteger)index;
+- (UIScrollView *_Nonnull)pageScrollView:(THPageScrollView *_Nullable)pageScrollView scrollViewForItemAtIndex:(NSInteger)index;
 
 @optional
 
 /**
- 头部view
+ pageHeaderView
  
  @return view
  */
-- (UIView *)pageScrollViewHeaderView;
+- (UIView *_Nullable)pageScrollViewHeaderView;
 
 /**
- 悬浮view
+ menubarView,floatingView
  
  @return view
  */
-- (UIView *)pageScrollViewBarView;
+- (UIView *_Nullable)pageScrollViewBarView;
 
 @end
 
@@ -86,22 +106,26 @@ NS_ASSUME_NONNULL_BEGIN
 @interface THPageScrollView : UIView
 
 @property (nonatomic, weak) id<THPageScrollViewDelegate>delegate;
+
 @property (nonatomic, weak) id<THPageScrollViewDataSource>dataSource;
 
 /**
- 底层scrollview 可上下滚动
+ main scrollview
  */
 @property (nonatomic, strong) UIScrollView *mainBackScrollView;
 
 /**
- 水平滑动的scrollview 的容器
+main back view
  */
 @property (nonatomic, strong) UIView *pageBackView;
 
 /**
- 水平滑动的scrollview
+horizontalScrollView
  */
 @property (nonatomic, strong) UIScrollView *horizontalScrollView;
+
+@property (nonatomic, weak) UIView *pageBarView;
+@property (nonatomic, weak) UIView *pageHeaderView;
 
 /**
  *  headerview.height
@@ -109,39 +133,40 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) CGFloat pageHeaderViewHeight;
 
 /**
- 悬浮view.height
+pageBarView.height
  */
 @property (nonatomic, assign) CGFloat pageBarHeight;
 
-/**
- * 获取pageivew当前childView的index
- */
-@property (nonatomic, readonly) NSInteger currentItemIndex;
-
-/**
- 默认选中index
- */
 @property (nonatomic, assign) NSUInteger defaultSeletedIndex;
 
-/**
- *  获取pageivew当前childView
- */
-@property (nonatomic, readonly, strong) UIView * currentView;
+@property (nonatomic, assign, readonly) NSInteger currentItemIndex;
 
 /**
- *  showsVerticalScrollIndicator 
+ mainScrollView.showsVerticalScrollIndicator,default is YES;
  */
 @property (nonatomic, assign) BOOL showsVerticalScrollIndicator;
 
 /**
- *  pageBarScrollEnable是否跟随滚动，默认为 YES;
+ pageBarView scrollView with mainScrollView,default is YES;
  */
 @property (nonatomic, assign) BOOL pageBarScrollEnable;
 
 - (void)reloadData;
 
+/**
+ set pageScrollView select index
+
+ @param index index
+ @param animated animated
+ */
 - (void)pageViewScrollToIndex:(NSInteger)index animated:(BOOL)animated;
 
+/**
+ update HeaderView's heigt
+
+ @param height height
+ @param animated animated
+ */
 - (void)updateHeaderViewHeight:(CGFloat)height animated:(BOOL)animated;
 
 @end

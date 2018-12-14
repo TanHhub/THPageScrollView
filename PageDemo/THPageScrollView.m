@@ -7,6 +7,28 @@
 //
 
 #import "THPageScrollView.h"
+#import "UIView+THExtentsion.h"
+#import <objc/runtime.h>
+
+@interface UIScrollView (THPageScroollViewExtension)
+
+@property (nonatomic, assign) NSInteger thPageScrollIndex;
+
+@end
+
+@implementation UIScrollView (THPageScroollViewExtension)
+
+- (void)setThPageScrollIndex:(NSInteger)thPageScrollIndex
+{
+    objc_setAssociatedObject(self, @selector(thPageScrollIndex), @(thPageScrollIndex), OBJC_ASSOCIATION_ASSIGN);
+}
+
+- (NSInteger)thPageScrollIndex {
+    NSNumber *number = objc_getAssociatedObject(self, _cmd);
+    return number.integerValue;
+}
+
+@end
 
 @interface THPageScrollView() <UIScrollViewDelegate>
 
@@ -21,14 +43,11 @@
 @property (nonatomic, strong) NSMutableArray<NSNumber *> *offsetsCache;
 @property (nonatomic, strong) NSMutableArray *scrollViewObserverCache;
 
-@property (nonatomic, strong) NSMutableDictionary <NSString *, UIView *> *childViews;//存储controller.view
-@property (nonatomic, strong) NSMutableDictionary <NSString *, UIScrollView *> *subscrollViews; //储存view.scrollview or scrollview
+@property (nonatomic, strong) NSMutableDictionary <NSString *, UIView *> *childViews;//controller.view
+@property (nonatomic, strong) NSMutableDictionary <NSString *, UIScrollView *> *subscrollViews; //sub scrollview
 
 @property (nonatomic, assign) BOOL isInScrolling;
 @property (nonatomic, assign) CGFloat lastOffsetY;
-
-@property (nonatomic, weak) UIView *pageBarView;
-@property (nonatomic, weak) UIView *pageHeaderView;
 
 @end
 
@@ -45,6 +64,7 @@
         self.defaultSeletedIndex = 0;
         self.kWidth = self.frame.size.width;
         self.kHeight = self.frame.size.height;
+        self.pageBarScrollEnable = YES;
     }
     return self;
 }
@@ -55,21 +75,21 @@
     if (self) {
         self.selectedIndex = 0;
         self.defaultSeletedIndex = 0;
-        self.pageBarHeight = 40;
         self.kWidth = self.frame.size.width;
         self.kHeight = self.frame.size.height;
+        self.pageBarScrollEnable = YES;
     }
     return self;
 }
 
 #pragma mark ____________________________________
 #pragma mark remove scrollview.observer
-
 - (void)removeScrollViewObservers {
-
+    
     for (NSInteger i = _scrollViewObserverCache.count-1;i>=0;i--) {
         UIView *sub = _scrollViewObserverCache[i];
         if (sub && [sub isKindOfClass:[UIScrollView class]]) {
+            [sub removeObserver:self forKeyPath:@"contentSize"];
             [_scrollViewObserverCache removeObject:sub];
         }
     }
@@ -82,10 +102,10 @@
     if (scrollView == nil || ![scrollView isKindOfClass:[UIScrollView class]]) {
         return;
     }
-
+    
     if (![self.scrollViewObserverCache containsObject:scrollView]) {
-        
-        [scrollView addObserver:self forKeyPath:@"contentSize" options:NSKeyValueObservingOptionNew|NSKeyValueObservingOptionOld context:(__bridge void * _Nullable)([NSString stringWithFormat:@"%ld",index])];
+        scrollView.thPageScrollIndex = index;
+        [scrollView addObserver:self forKeyPath:@"contentSize" options:NSKeyValueObservingOptionNew|NSKeyValueObservingOptionOld context:NULL];//context: in iOS 8 ,sompe codition will cause crash,so use thPageScrollIndex to distinguish scrollView
         [self.scrollViewObserverCache addObject:scrollView];
     }
 }
@@ -95,9 +115,13 @@
                        context:(void *)context
 {
     if ([keyPath isEqualToString:@"contentSize"]) {
-        NSInteger index = [(__bridge NSString * _Nonnull)(context) integerValue];
-        UIScrollView *scrollView = [self.subscrollViews valueForKey:(__bridge NSString * _Nonnull)(context)];
-        [self updateContentSize:scrollView.contentSize index:index];
+        UIScrollView *scrollView = (UIScrollView *)object;
+        if ([scrollView isKindOfClass:[UIScrollView class]]) {
+            if ([[self.subscrollViews allValues] containsObject:scrollView]) {
+                NSInteger index = scrollView.thPageScrollIndex;
+                [self updateContentSize:scrollView.contentSize index:index];
+            }
+        }
     }
 }
 
@@ -111,8 +135,8 @@
     CGSize contentSize = size;
   
     contentSize.height = contentSize.height + self.pageHeaderViewHeight + self.pageBarHeight;
-    //mainBackScrollView 最小的滚动范围
-    CGFloat minContentSizeHeight = self.frame.size.height + self.pageHeaderViewHeight + self.pageBarHeight;
+    //mainBackScrollView'min contentsize
+    CGFloat minContentSizeHeight = self.kHeight + self.pageHeaderViewHeight + self.pageBarHeight;
     if (contentSize.height < minContentSizeHeight) {
         contentSize.height = minContentSizeHeight;
     }
@@ -128,17 +152,43 @@
 #pragma mark reset
 - (void)reloadData
 {
+    //clear scrollView's observer
     [self removeScrollViewObservers];
+    
+    //remove subviews if have
     [self clearAllSubViews];
     NSAssert(self.dataSource != nil, @"pageView.datasource can't be nil !!!");
     
-    self.pageViewsCount = [self.dataSource numberOfChildControllersInPageView:self];
+    self.pageViewsCount = [self.dataSource numberOfChildViewsInPageView:self];
     if (self.pageViewsCount < 1) {
         return;
     }
     
-    self.horizontalScrollView.contentSize = CGSizeMake(self.kWidth * self.pageViewsCount, 0);
+    //add mainscrollview,backview,horizontalScrollView
+    [self setUpSubViews];
+    
+    //if horizontalScrollView has not scroll use the defaultSeletedIndex
+    if (self.defaultSeletedIndex > 0 && self.defaultSeletedIndex < self.pageViewsCount) {
+        self.selectedIndex = self.defaultSeletedIndex;
+    }
+    //add currentIndex's itemView
+    [self setUpCurrentIndexView];
+    
+    //reset scrollview.offset
+    [self resetContetnOffset];
+    
+    if (self.selectedIndex > 0) {
+        [self.horizontalScrollView setContentOffset:CGPointMake(self.kWidth * self.selectedIndex, 0) animated:NO];
+    }
+    
+    [self layoutIfNeeded];
+}
 
+//add mainscrollView, horizontalScrollView,pageHeadrView,pagebarView
+- (void)setUpSubViews
+{
+    self.horizontalScrollView.contentSize = CGSizeMake(self.kWidth * self.pageViewsCount, 0);
+    
     [self initOffsetCache];
     
     [self addSubview:self.mainBackScrollView];
@@ -148,27 +198,33 @@
     
     self.pageBarView = [self.dataSource pageScrollViewBarView];
     self.pageHeaderView = [self.dataSource pageScrollViewHeaderView];
-
+    
     if (_pageHeaderView && self.pageHeaderViewHeight > 0) {
         [self.mainBackScrollView addSubview:_pageHeaderView];
     }
+    
     if (_pageBarView) {
         _pageBarView.frame = CGRectMake(0, self.pageHeaderViewHeight, self.kWidth, self.pageBarHeight);
         [self.mainBackScrollView addSubview:_pageBarView];
     }
-    
-    if (self.defaultSeletedIndex > 0 && self.defaultSeletedIndex < self.pageViewsCount) {
-        self.selectedIndex = self.defaultSeletedIndex;
-    }
-    
+}
+
+
+
+- (void)setUpCurrentIndexView
+{
+
+    //use viewForItemAtIndex first
     UIView *atIndexView = [self.dataSource pageScrollView:self viewForItemAtIndex:self.selectedIndex];
     UIScrollView *atIndexScrollView = [self.dataSource pageScrollView:self scrollViewForItemAtIndex:self.selectedIndex];
     
     if (atIndexView) {
         [self.childViews setObject:atIndexView forKey:[NSString stringWithFormat:@"%lu",(unsigned long)self.selectedIndex]];
         [self.horizontalScrollView addSubview:atIndexView];
+        // if atIndexView is UITableViewController.view,UITableViewController.tableView.frame change as atIndexView
+        //will display out off screen
         atIndexView.frame = CGRectMake(self.kWidth * self.selectedIndex, 0, self.kWidth, self.kHeight);
-
+        
         if (atIndexScrollView != nil && [atIndexScrollView isKindOfClass:[UIScrollView class]]) {
             atIndexScrollView.scrollEnabled = NO;
             [self.subscrollViews setObject:atIndexScrollView forKey:[NSString stringWithFormat:@"%lu",(unsigned long)self.selectedIndex]];
@@ -182,17 +238,9 @@
             atIndexScrollView.frame = CGRectMake(self.kWidth * self.selectedIndex, 0, self.kWidth, self.kHeight);
             [self safeAddObserver:atIndexScrollView index:self.selectedIndex];
         } else {
-            NSLog(@"viewForItemAtIndex return nil!");
+            NSLog(@"viewForItemAtIndex and scrollViewForItemAtIndex return nil!");
         }
     }
-    
-    [self resetContetnOffset];
-    
-    if (self.selectedIndex > 0) {
-        [self.horizontalScrollView setContentOffset:CGPointMake(self.kWidth * self.selectedIndex, 0) animated:NO];
-    }
-    
-    [self layoutIfNeeded];
 }
 
 - (void)clearAllSubViews
@@ -220,6 +268,7 @@
     }
 }
 
+//设置mainBackScrollView及当前选中的scrollView为初始状态
 - (void)resetContetnOffset
 {
     [self.mainBackScrollView setContentOffset:CGPointMake(0, 0) animated:NO];
@@ -230,6 +279,7 @@
     }
 }
 
+#pragma mark -- 改变pageHeadrView.height
 - (void)updateHeaderViewHeight:(CGFloat)height animated:(BOOL)animated
 {
     if (self.pageHeaderViewHeight == height) {
@@ -240,7 +290,7 @@
     CGSize contentSize = self.mainBackScrollView.contentSize;
     contentSize.height = contentSize.height - tempOffsetY;
 
-    CGFloat minContentSizeHeight = self.frame.size.height+self.pageHeaderViewHeight + self.pageBarHeight;
+    CGFloat minContentSizeHeight = self.kHeight + self.pageHeaderViewHeight + self.pageBarHeight;
     if (contentSize.height < minContentSizeHeight) {
         contentSize.height = minContentSizeHeight;
     }
@@ -283,7 +333,7 @@
 
 - (UIView *)loadCachedViewOrCreateOneAtIndex:(NSInteger)index
 {
-    UIView *cView = [self.childViews objectForKey:[NSString stringWithFormat:@"%ld", index]];
+    UIView *cView = [self.childViews objectForKey:[NSString stringWithFormat:@"%ld", (long)index]];
     if (cView == nil) {
         cView = [self.dataSource pageScrollView:self viewForItemAtIndex:index];
         if (cView) {
@@ -291,7 +341,7 @@
             CGFloat h = self.kHeight;
             cView.frame = CGRectMake(index * w, 0, w, h);
             [self.horizontalScrollView addSubview:cView];
-            [self.childViews setObject:cView forKey:[NSString stringWithFormat:@"%ld", index]];
+            [self.childViews setObject:cView forKey:[NSString stringWithFormat:@"%ld", (long)index]];
         }
     }
     return cView;
@@ -299,14 +349,14 @@
 
 - (void)loadCachedScrollViewOrCreateOneAtIndex:(NSInteger)index needAddScroll:(BOOL)needAddScroll
 {
-    UIScrollView *ascrollview = [self.subscrollViews objectForKey:[NSString stringWithFormat:@"%ld", index]];
+    UIScrollView *ascrollview = [self.subscrollViews objectForKey:[NSString stringWithFormat:@"%ld", (long)index]];
     if (ascrollview == nil) {
         ascrollview = [self.dataSource pageScrollView:self scrollViewForItemAtIndex:index];
         if (ascrollview) {
             ascrollview.scrollEnabled = NO;
             [ascrollview setContentOffset:CGPointMake(0, 0)];
             [self safeAddObserver:ascrollview index:index];
-            [self.subscrollViews setObject:ascrollview forKey:[NSString stringWithFormat:@"%ld", index]];
+            [self.subscrollViews setObject:ascrollview forKey:[NSString stringWithFormat:@"%ld", (long)index]];
             CGFloat w = self.kWidth;
             CGFloat h = self.kHeight;
             if (needAddScroll) {
@@ -347,10 +397,9 @@
         }
     } else if (scrollView == _mainBackScrollView) {
         [self synScrollCurrentScrollview:scrollView withSelectedIndex:[self localIndex]];
-    }
-    
-    if ([self.delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
-        [self.delegate scrollViewDidScroll:scrollView];
+        if ([self.delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
+            [self.delegate verticalScrollViewDidScroll:scrollView];
+        }
     }
 }
 
@@ -387,7 +436,7 @@
 
 - (void)updateScrollViewOffsetY:(CGFloat)offset atIndex:(NSInteger)index
 {
-    UIScrollView *scrollView = [self.subscrollViews valueForKey:[NSString stringWithFormat:@"%ld",index]];
+    UIScrollView *scrollView = [self.subscrollViews valueForKey:[NSString stringWithFormat:@"%ld",(long)index]];
     if (scrollView && [scrollView isKindOfClass:[UIScrollView class]]) {
         [scrollView setContentOffset:CGPointMake(0, offset)];
     }
@@ -395,8 +444,10 @@
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
     
-    if (self.delegate && [self.delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {
-        [self.delegate scrollViewWillBeginDragging:scrollView];
+    if (scrollView == _mainBackScrollView) {
+        if (self.delegate && [self.delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {
+            [self.delegate verticalScrollViewWillBeginDragging:scrollView];
+        }
     }
     
     if (scrollView == _horizontalScrollView) {
@@ -407,11 +458,10 @@
     }
 }
 
-
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
     
     if (self.delegate && [self.delegate respondsToSelector:@selector(scrollViewDidEndDecelerating:)]) {
-        [self.delegate scrollViewDidEndDecelerating:scrollView];
+        [self.delegate verticalScrollViewDidEndDecelerating:scrollView];
     }
     
     if (scrollView == _horizontalScrollView) {
@@ -430,12 +480,6 @@
         }
         [self didEndScrollPageView];
     }
-}
-
-- (NSInteger)localIndex {
-    NSInteger index = round(self.horizontalScrollView.contentOffset.x / self.horizontalScrollView.frame.size.width);
-    self.selectedIndex = index;
-    return index;
 }
 
 - (void)willBeginScrollPageView {
@@ -481,21 +525,21 @@
 - (void)pageViewScrollToIndex:(NSInteger)index animated:(BOOL)animated
 {
     if (index >= 0 && index < self.pageViewsCount) {
-        [_horizontalScrollView setContentOffset:CGPointMake(self.kWidth*index, 0) animated:animated];
+        if (animated) {
+            [_horizontalScrollView setContentOffset:CGPointMake(self.kWidth*index, 0) animated:animated];
+        } else {
+            //animated == NO ,不能触发beginDragging
+            [self willBeginScrollPageView];
+            [_horizontalScrollView setContentOffset:CGPointMake(self.kWidth*index, 0)];
+            [self didEndScrollPageView];
+        }
     }
 }
 
-- (UIView *)currentView
-{
-    UIView *itemView = nil;
-    
-    itemView = [self.childViews valueForKey:[NSString stringWithFormat:@"%ld",self.selectedIndex]];
-    
-    if (itemView == nil) {
-        itemView = [self.subscrollViews valueForKey:[NSString stringWithFormat:@"%ld",self.selectedIndex]];
-    }
-    
-    return itemView;
+- (NSInteger)localIndex {
+    NSInteger index = round(self.horizontalScrollView.contentOffset.x / self.horizontalScrollView.frame.size.width);
+    self.selectedIndex = index;
+    return index;
 }
 
 - (NSInteger)currentItemIndex
@@ -503,6 +547,7 @@
     return self.selectedIndex;
 }
 
+#pragma mark -- lazy
 - (UIScrollView *)horizontalScrollView
 {
     if (_horizontalScrollView == nil) {
@@ -521,8 +566,9 @@
     if (_mainBackScrollView == nil) {
         _mainBackScrollView = [[UIScrollView alloc] initWithFrame:self.bounds];
         _mainBackScrollView.delegate                = self;
-        _mainBackScrollView.contentSize            = CGSizeMake(self.kWidth, self.frame.size.height);
+        _mainBackScrollView.contentSize            = CGSizeMake(0, self.frame.size.height);
         _mainBackScrollView.backgroundColor        = [UIColor clearColor];
+        _mainBackScrollView.showsVerticalScrollIndicator = self.showsVerticalScrollIndicator;
     }
     return _mainBackScrollView;
 }
@@ -530,8 +576,7 @@
 - (UIView *)pageBackView
 {
     if (_pageBackView == nil) {
-        _pageBackView = [[UIView alloc] initWithFrame:CGRectMake(0, self.pageHeaderViewHeight + self.pageBarHeight, self.kWidth, self.kHeight -self.pageBarHeight)];
-        _mainBackScrollView.showsVerticalScrollIndicator = self.showsVerticalScrollIndicator;
+        _pageBackView = [[UIView alloc] initWithFrame:CGRectMake(0, self.pageHeaderViewHeight + self.pageBarHeight, self.kWidth, self.kHeight - self.pageBarHeight)];
     }
     return _pageBackView;
 }
