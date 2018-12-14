@@ -15,7 +15,6 @@
 		424CD45121A1555B00AA4615 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD45021A1555B00AA4615 /* main.m */; };
 		424CD45B21A1555B00AA4615 /* PageDemoTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD45A21A1555B00AA4615 /* PageDemoTests.m */; };
 		424CD46621A1555B00AA4615 /* PageDemoUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD46521A1555B00AA4615 /* PageDemoUITests.m */; };
-		424CD47521A1557000AA4615 /* PageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD47421A1557000AA4615 /* PageViewController.m */; };
 		424CD47821A1558100AA4615 /* ListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD47721A1558100AA4615 /* ListViewController.m */; };
 		424CD47B21A156AE00AA4615 /* THPageScrollView.m in Sources */ = {isa = PBXBuildFile; fileRef = 424CD47A21A156AE00AA4615 /* THPageScrollView.m */; };
 		C181934C21BE44920083FB25 /* UIView+THExtentsion.m in Sources */ = {isa = PBXBuildFile; fileRef = C181934B21BE44920083FB25 /* UIView+THExtentsion.m */; };
@@ -57,8 +56,6 @@
 		424CD46121A1555B00AA4615 /* PageDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PageDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		424CD46521A1555B00AA4615 /* PageDemoUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PageDemoUITests.m; sourceTree = "<group>"; };
 		424CD46721A1555B00AA4615 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		424CD47321A1557000AA4615 /* PageViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PageViewController.h; sourceTree = "<group>"; };
-		424CD47421A1557000AA4615 /* PageViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PageViewController.m; sourceTree = "<group>"; };
 		424CD47621A1558100AA4615 /* ListViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ListViewController.h; sourceTree = "<group>"; };
 		424CD47721A1558100AA4615 /* ListViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ListViewController.m; sourceTree = "<group>"; };
 		424CD47921A156AE00AA4615 /* THPageScrollView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = THPageScrollView.h; sourceTree = "<group>"; };
@@ -130,8 +127,6 @@
 				424CD44C21A1555B00AA4615 /* LaunchScreen.storyboard */,
 				424CD44F21A1555B00AA4615 /* Info.plist */,
 				424CD45021A1555B00AA4615 /* main.m */,
-				424CD47321A1557000AA4615 /* PageViewController.h */,
-				424CD47421A1557000AA4615 /* PageViewController.m */,
 				424CD47621A1558100AA4615 /* ListViewController.h */,
 				424CD47721A1558100AA4615 /* ListViewController.m */,
 				424CD47921A156AE00AA4615 /* THPageScrollView.h */,
@@ -340,7 +335,6 @@
 				424CD44621A1555A00AA4615 /* ViewController.m in Sources */,
 				424CD45121A1555B00AA4615 /* main.m in Sources */,
 				424CD44321A1555900AA4615 /* AppDelegate.m in Sources */,
-				424CD47521A1557000AA4615 /* PageViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
